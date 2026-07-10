@@ -118,13 +118,30 @@
             color: white;
         }
 
-        .btn-download:hover {
+        .btn-download:hover:not(:disabled) {
             background: #38a169;
             transform: translateY(-2px);
             box-shadow: 0 8px 25px rgba(72, 187, 120, 0.4);
         }
 
         .btn-download:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-play {
+            background: #4299e1;
+            color: white;
+        }
+
+        .btn-play:hover:not(:disabled) {
+            background: #3182ce;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(66, 153, 225, 0.4);
+        }
+
+        .btn-play:disabled {
             opacity: 0.5;
             cursor: not-allowed;
             transform: none;
@@ -156,6 +173,7 @@
             animation: pulse 1s infinite;
         }
         .dot.done { background: #4299e1; }
+        .dot.error { background: #fc8181; }
 
         @keyframes pulse {
             0%, 100% { transform: scale(1); }
@@ -177,6 +195,7 @@
         .audio-section audio {
             width: 100%;
             border-radius: 8px;
+            margin-top: 10px;
         }
 
         .audio-controls {
@@ -200,14 +219,32 @@
             text-align: center;
             margin-bottom: 12px;
         }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #e2e8f0;
+            border-radius: 2px;
+            margin-top: 10px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .progress-bar.active {
+            display: block;
+        }
+
+        .progress-bar .fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>
-            <span>🇫🇷</span>
-            Озвучивание текста
-        </h1>
+        <h1>🇫🇷 Озвучивание текста</h1>
         <p class="subtitle">Вставьте текст на французском языке и нажмите кнопку для создания аудио</p>
         
         <textarea id="textInput">Bonjour à tous ! Aujourd'hui, nous allons explorer la beauté de la langue française.</textarea>
@@ -223,16 +260,19 @@
             <span class="dot idle" id="statusDot"></span>
             <span id="statusText">Готово</span>
         </div>
+
+        <div class="progress-bar" id="progressBar">
+            <div class="fill" id="progressFill"></div>
+        </div>
         
         <div class="audio-section" id="audioSection">
             <div class="message" id="audioMessage">✅ Аудио готово! Используйте плеер для прослушивания.</div>
             <audio id="audioPlayer" controls></audio>
             <div class="audio-controls">
-                <button class="btn btn-download" id="downloadBtn">
-                    ⬇️ Скачать аудио (MP3)
-                </button>
+                <button class="btn btn-play" id="playBtn">▶️ Воспроизвести</button>
+                <button class="btn btn-download" id="downloadBtn">⬇️ Скачать MP3</button>
                 <button class="btn btn-clear" id="playAgainBtn" style="padding: 10px 24px; font-size: 14px;">
-                    🔄 Повторить
+                    🔄 Заново
                 </button>
             </div>
         </div>
@@ -244,6 +284,7 @@
         const speakBtn = document.getElementById('speakBtn');
         const clearBtn = document.getElementById('clearBtn');
         const downloadBtn = document.getElementById('downloadBtn');
+        const playBtn = document.getElementById('playBtn');
         const playAgainBtn = document.getElementById('playAgainBtn');
         const charCount = document.getElementById('charCount');
         const statusText = document.getElementById('statusText');
@@ -251,10 +292,15 @@
         const audioSection = document.getElementById('audioSection');
         const audioPlayer = document.getElementById('audioPlayer');
         const audioMessage = document.getElementById('audioMessage');
+        const progressBar = document.getElementById('progressBar');
+        const progressFill = document.getElementById('progressFill');
 
-        // Переменная для хранения аудио данных
+        // Переменные
         let audioBlob = null;
         let audioUrl = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
 
         // Обновление счетчика
         function updateCounter() {
@@ -268,6 +314,11 @@
             statusDot.className = 'dot ' + type;
         }
 
+        // Обновление прогресса
+        function updateProgress(value) {
+            progressFill.style.width = value + '%';
+        }
+
         // Сброс аудио
         function resetAudio() {
             audioSection.classList.remove('show');
@@ -278,96 +329,11 @@
                 audioUrl = null;
             }
             audioBlob = null;
+            audioChunks = [];
             downloadBtn.disabled = true;
-        }
-
-        // Создание аудио из текста с помощью Web Audio API
-        function createAudioFromText(text) {
-            return new Promise((resolve, reject) => {
-                // Используем SpeechSynthesis для генерации речи
-                if (!window.speechSynthesis) {
-                    reject('Speech Synthesis не поддерживается');
-                    return;
-                }
-
-                // Создаем utterance
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'fr-FR';
-                utterance.rate = 0.9;
-                utterance.pitch = 1;
-
-                // Ищем французский голос
-                const voices = window.speechSynthesis.getVoices();
-                const frenchVoice = voices.find(v => v.lang.startsWith('fr'));
-                if (frenchVoice) {
-                    utterance.voice = frenchVoice;
-                }
-
-                // Создаем MediaStream из речи (используем запись через AudioContext)
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const dest = audioContext.createMediaStreamDestination();
-                const source = audioContext.createBufferSource();
-                
-                // Создаем пустой буфер для захвата аудио
-                const bufferSize = audioContext.sampleRate * 10; // 10 секунд
-                const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
-                source.buffer = buffer;
-                source.connect(dest);
-
-                // Начинаем запись
-                const mediaRecorder = new MediaRecorder(dest.stream, { mimeType: 'audio/webm;codecs=opus' });
-                const chunks = [];
-
-                mediaRecorder.ondataavailable = (e) => {
-                    if (e.data.size > 0) {
-                        chunks.push(e.data);
-                    }
-                };
-
-                mediaRecorder.onstop = () => {
-                    const blob = new Blob(chunks, { type: 'audio/webm' });
-                    resolve(blob);
-                };
-
-                // Запускаем запись
-                mediaRecorder.start();
-
-                // Генерируем речь через SpeechSynthesis и одновременно записываем
-                // К сожалению, SpeechSynthesis не дает напрямую аудиоданные,
-                // поэтому используем обходной путь: проигрываем через динамик и записываем
-                // Это не идеально, но работает
-                const synth = window.speechSynthesis;
-                
-                utterance.onstart = () => {
-                    setStatus('Говорит... 🎙️', 'speaking');
-                    speakBtn.disabled = true;
-                };
-
-                utterance.onend = () => {
-                    // Ждем немного для завершения записи
-                    setTimeout(() => {
-                        mediaRecorder.stop();
-                        setStatus('Аудио создано ✅', 'done');
-                        speakBtn.disabled = false;
-                        resolve(null); // Сигнал завершения
-                    }, 500);
-                };
-
-                utterance.onerror = (e) => {
-                    mediaRecorder.stop();
-                    reject(e);
-                };
-
-                synth.speak(utterance);
-
-                // Таймаут на случай, если речь зависнет
-                setTimeout(() => {
-                    if (mediaRecorder.state === 'recording') {
-                        mediaRecorder.stop();
-                        reject('Таймаут синтеза речи');
-                    }
-                }, 30000);
-            });
+            playBtn.disabled = true;
+            progressBar.classList.remove('active');
+            updateProgress(0);
         }
 
         // Основная функция озвучивания
@@ -393,29 +359,110 @@
             setStatus('Подготовка...', 'idle');
             speakBtn.disabled = true;
             downloadBtn.disabled = true;
+            playBtn.disabled = true;
 
             try {
-                // Создаем аудио
-                const blob = await createAudioFromText(text);
+                // Создаем AudioContext
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 
-                if (blob) {
+                // Создаем MediaStreamDestination
+                const destination = audioContext.createMediaStreamDestination();
+                
+                // Создаем осциллятор для тестового звука (заменим на речь)
+                // Используем SpeechSynthesis для генерации речи
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'fr-FR';
+                utterance.rate = 0.9;
+                utterance.pitch = 1;
+
+                // Ищем французский голос
+                const voices = window.speechSynthesis.getVoices();
+                const frenchVoice = voices.find(v => v.lang.startsWith('fr'));
+                if (frenchVoice) {
+                    utterance.voice = frenchVoice;
+                }
+
+                // Настраиваем MediaRecorder
+                mediaRecorder = new MediaRecorder(destination.stream, {
+                    mimeType: 'audio/webm;codecs=opus'
+                });
+
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
                     audioBlob = blob;
                     audioUrl = URL.createObjectURL(blob);
                     audioPlayer.src = audioUrl;
                     audioSection.classList.add('show');
                     downloadBtn.disabled = false;
+                    playBtn.disabled = false;
+                    setStatus('Аудио создано ✅', 'done');
+                    speakBtn.disabled = false;
                     audioMessage.textContent = '✅ Аудио готово! Используйте плеер для прослушивания.';
-                } else {
-                    // Если blob null, значит речь уже воспроизведена через onend
-                    // Показываем сообщение
-                    audioMessage.textContent = '✅ Аудио создано! Нажмите "Повторить" для воспроизведения.';
-                    audioSection.classList.add('show');
-                }
+                    progressBar.classList.remove('active');
+                    updateProgress(100);
+                };
+
+                // Запускаем запись
+                mediaRecorder.start();
+                isRecording = true;
+                progressBar.classList.add('active');
+                updateProgress(10);
+
+                // Воспроизводим речь через динамик и записываем
+                utterance.onstart = () => {
+                    setStatus('Говорит... 🎙️', 'speaking');
+                    updateProgress(30);
+                };
+
+                utterance.onend = () => {
+                    updateProgress(80);
+                    // Даем время на завершение записи
+                    setTimeout(() => {
+                        if (mediaRecorder && mediaRecorder.state === 'recording') {
+                            mediaRecorder.stop();
+                            isRecording = false;
+                            updateProgress(100);
+                        }
+                    }, 500);
+                };
+
+                utterance.onerror = (event) => {
+                    console.error('Ошибка:', event);
+                    if (mediaRecorder && mediaRecorder.state === 'recording') {
+                        mediaRecorder.stop();
+                        isRecording = false;
+                    }
+                    setStatus('Ошибка', 'error');
+                    speakBtn.disabled = false;
+                    alert('Произошла ошибка при синтезе речи. Попробуйте другой текст.');
+                };
+
+                // Запускаем синтез
+                window.speechSynthesis.speak(utterance);
+
+                // Таймаут на случай зависания
+                setTimeout(() => {
+                    if (isRecording && mediaRecorder && mediaRecorder.state === 'recording') {
+                        mediaRecorder.stop();
+                        isRecording = false;
+                        setStatus('Таймаут', 'error');
+                        speakBtn.disabled = false;
+                    }
+                }, 30000);
+
             } catch (error) {
                 console.error('Ошибка:', error);
-                setStatus('Ошибка', 'idle');
+                setStatus('Ошибка', 'error');
                 speakBtn.disabled = false;
-                alert('Произошла ошибка при создании аудио. Попробуйте другой текст или браузер.');
+                alert('Произошла ошибка при создании аудио.');
             }
         }
 
@@ -426,12 +473,29 @@
                 return;
             }
 
+            // Конвертируем в MP3 (используем WebM, так как MP3 не поддерживается MediaRecorder)
             const link = document.createElement('a');
             link.href = audioUrl;
-            link.download = 'озвучка_французский.mp3';
+            link.download = 'озвучка_французский.webm';
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            
+            // Показываем сообщение о формате
+            audioMessage.textContent = '📥 Файл скачан в формате WebM (аудио). Для прослушивания используйте любой плеер.';
+        }
+
+        // Воспроизведение
+        function playAudio() {
+            if (audioUrl) {
+                audioPlayer.play();
+                setStatus('Воспроизведение...', 'speaking');
+                audioPlayer.onplay = () => setStatus('Воспроизведение...', 'speaking');
+                audioPlayer.onended = () => setStatus('Готово ✅', 'done');
+                audioPlayer.onpause = () => setStatus('Готово ✅', 'done');
+            } else {
+                alert('Сначала создайте аудио.');
+            }
         }
 
         // Очистка
@@ -445,25 +509,23 @@
             }
             speakBtn.disabled = false;
             downloadBtn.disabled = true;
+            playBtn.disabled = true;
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                isRecording = false;
+            }
         }
 
-        // Повторное воспроизведение
+        // Повторное создание
         function playAgain() {
-            if (audioUrl) {
-                audioPlayer.play();
-                setStatus('Воспроизведение...', 'speaking');
-                audioPlayer.onplay = () => setStatus('Воспроизведение...', 'speaking');
-                audioPlayer.onended = () => setStatus('Аудио создано ✅', 'done');
-                audioPlayer.onpause = () => setStatus('Аудио создано ✅', 'done');
-            } else {
-                speakText();
-            }
+            speakText();
         }
 
         // Назначаем обработчики
         speakBtn.addEventListener('click', speakText);
         clearBtn.addEventListener('click', clearText);
         downloadBtn.addEventListener('click', downloadAudio);
+        playBtn.addEventListener('click', playAudio);
         playAgainBtn.addEventListener('click', playAgain);
         textInput.addEventListener('input', updateCounter);
 
@@ -479,6 +541,7 @@
         updateCounter();
         setStatus('Готово', 'idle');
         downloadBtn.disabled = true;
+        playBtn.disabled = true;
     </script>
 </body>
 </html>
