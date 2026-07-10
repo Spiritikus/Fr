@@ -240,6 +240,13 @@
             width: 0%;
             transition: width 0.3s;
         }
+
+        .download-info {
+            margin-top: 8px;
+            font-size: 13px;
+            color: #718096;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -270,11 +277,12 @@
             <audio id="audioPlayer" controls></audio>
             <div class="audio-controls">
                 <button class="btn btn-play" id="playBtn">▶️ Воспроизвести</button>
-                <button class="btn btn-download" id="downloadBtn">⬇️ Скачать MP3</button>
+                <button class="btn btn-download" id="downloadBtn">⬇️ Скачать аудио</button>
                 <button class="btn btn-clear" id="playAgainBtn" style="padding: 10px 24px; font-size: 14px;">
                     🔄 Заново
                 </button>
             </div>
+            <div class="download-info">Файл сохраняется в формате WebM (аудио). Воспроизводится в любом плеере.</div>
         </div>
     </div>
 
@@ -368,8 +376,7 @@
                 // Создаем MediaStreamDestination
                 const destination = audioContext.createMediaStreamDestination();
                 
-                // Создаем осциллятор для тестового звука (заменим на речь)
-                // Используем SpeechSynthesis для генерации речи
+                // Создаем utterance для речи
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'fr-FR';
                 utterance.rate = 0.9;
@@ -416,7 +423,7 @@
                 progressBar.classList.add('active');
                 updateProgress(10);
 
-                // Воспроизводим речь через динамик и записываем
+                // Воспроизводим речь
                 utterance.onstart = () => {
                     setStatus('Говорит... 🎙️', 'speaking');
                     updateProgress(30);
@@ -424,7 +431,6 @@
 
                 utterance.onend = () => {
                     updateProgress(80);
-                    // Даем время на завершение записи
                     setTimeout(() => {
                         if (mediaRecorder && mediaRecorder.state === 'recording') {
                             mediaRecorder.stop();
@@ -445,10 +451,9 @@
                     alert('Произошла ошибка при синтезе речи. Попробуйте другой текст.');
                 };
 
-                // Запускаем синтез
                 window.speechSynthesis.speak(utterance);
 
-                // Таймаут на случай зависания
+                // Таймаут
                 setTimeout(() => {
                     if (isRecording && mediaRecorder && mediaRecorder.state === 'recording') {
                         mediaRecorder.stop();
@@ -473,7 +478,6 @@
                 return;
             }
 
-            // Конвертируем в MP3 (используем WebM, так как MP3 не поддерживается MediaRecorder)
             const link = document.createElement('a');
             link.href = audioUrl;
             link.download = 'озвучка_французский.webm';
@@ -481,8 +485,10 @@
             link.click();
             document.body.removeChild(link);
             
-            // Показываем сообщение о формате
-            audioMessage.textContent = '📥 Файл скачан в формате WebM (аудио). Для прослушивания используйте любой плеер.';
+            audioMessage.textContent = '📥 Файл скачан в формате WebM (аудио).';
+            setTimeout(() => {
+                audioMessage.textContent = '✅ Аудио готово! Используйте плеер для прослушивания.';
+            }, 3000);
         }
 
         // Воспроизведение
