@@ -291,7 +291,8 @@
         </div>
     </div>
 
-    <!-- Подключаем библиотеку lamejs для конвертации в MP3 -->
+    <!-- Подключаем библиотеки для конвертации в MP3 -->
+    <script src="https://cdn.jsdelivr.net/npm/opus-recorder@8.0.3/dist/opus-recorder.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
 
     <script>
@@ -318,6 +319,7 @@
         let audioChunks = [];
         let isRecording = false;
         let mp3Data = null;
+        let audioContext = null;
 
         // Обновление счетчика
         function updateCounter() {
@@ -360,24 +362,23 @@
             updateProgress(0);
         }
 
-        // Конвертация WebM в MP3
-        function convertToMp3(webmBlob) {
+        // Конвертация WAV в MP3 с помощью lamejs
+        function wavToMp3(wavBlob) {
             return new Promise((resolve, reject) => {
                 try {
                     const reader = new FileReader();
                     reader.onload = function(e) {
                         try {
                             const arrayBuffer = e.target.result;
-                            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                             
-                            audioContext.decodeAudioData(arrayBuffer, function(buffer) {
+                            audioCtx.decodeAudioData(arrayBuffer, function(buffer) {
                                 try {
                                     // Конвертируем в MP3
-                                    const channels = 1; // моно
+                                    const channels = 1;
                                     const sampleRate = 22050;
                                     const kbps = 128;
                                     
-                                    // Получаем данные из буфера
                                     const length = buffer.length;
                                     const samples = new Int16Array(length);
                                     const channelData = buffer.getChannelData(0);
@@ -386,7 +387,6 @@
                                         samples[i] = Math.max(-32768, Math.min(32767, Math.round(channelData[i] * 32767)));
                                     }
                                     
-                                    // Создаем MP3
                                     const mp3encoder = new lamejs.Mp3Encoder(channels, sampleRate, kbps);
                                     const mp3Data = [];
                                     const sampleBlockSize = 1152;
@@ -404,7 +404,6 @@
                                         mp3Data.push(mp3buf);
                                     }
                                     
-                                    // Создаем Blob из MP3 данных
                                     const mp3Blob = new Blob(mp3Data, { type: 'audio/mp3' });
                                     resolve(mp3Blob);
                                     
@@ -412,18 +411,107 @@
                                     reject('Ошибка конвертации: ' + error.message);
                                 }
                             }, function(error) {
-                                reject('Ошибка декодирования аудио: ' + error);
+                                reject('Ошибка декодирования: ' + error);
                             });
                         } catch (error) {
-                            reject('Ошибка чтения файла: ' + error);
+                            reject('Ошибка обработки: ' + error);
                         }
                     };
                     reader.onerror = function() {
                         reject('Ошибка чтения файла');
                     };
-                    reader.readAsArrayBuffer(webmBlob);
+                    reader.readAsArrayBuffer(wavBlob);
                 } catch (error) {
-                    reject('Ошибка конвертации: ' + error);
+                    reject('Ошибка: ' + error);
+                }
+            });
+        }
+
+        // Запись аудио с использованием MediaRecorder (WebM) и конвертация в WAV
+        async function recordAudio(text) {
+            return new Promise((resolve, reject) => {
+                try {
+                    // Создаем AudioContext для захвата звука
+                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    
+                    // Создаем MediaStream из синтеза речи
+                    // Используем осциллятор для теста? Нет, используем реальный синтез
+                    
+                    // Создаем MediaStreamDestination
+                    const destination = audioCtx.createMediaStreamDestination();
+                    
+                    // Создаем генератор речи
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'fr-FR';
+                    utterance.rate = 0.9;
+                    utterance.pitch = 1;
+                    
+                    // Ищем французский голос
+                    const voices = window.speechSynthesis.getVoices();
+                    const frenchVoice = voices.find(v => v.lang.startsWith('fr'));
+                    if (frenchVoice) {
+                        utterance.voice = frenchVoice;
+                    }
+                    
+                    // Настраиваем MediaRecorder
+                    const recorder = new MediaRecorder(destination.stream, {
+                        mimeType: 'audio/webm;codecs=opus'
+                    });
+                    
+                    const chunks = [];
+                    
+                    recorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            chunks.push(event.data);
+                        }
+                    };
+                    
+                    recorder.onstop = async () => {
+                        try {
+                            const webmBlob = new Blob(chunks, { type: 'audio/webm' });
+                            resolve(webmBlob);
+                        } catch (error) {
+                            reject(error);
+                        }
+                    };
+                    
+                    // Запускаем запись
+                    recorder.start();
+                    
+                    // Воспроизводим речь
+                    utterance.onstart = () => {
+                        setStatus('Говорит... 🎙️', 'speaking');
+                        updateProgress(30);
+                    };
+                    
+                    utterance.onend = () => {
+                        setTimeout(() => {
+                            if (recorder.state === 'recording') {
+                                recorder.stop();
+                                updateProgress(80);
+                            }
+                        }, 500);
+                    };
+                    
+                    utterance.onerror = (event) => {
+                        if (recorder.state === 'recording') {
+                            recorder.stop();
+                        }
+                        reject(event);
+                    };
+                    
+                    window.speechSynthesis.speak(utterance);
+                    
+                    // Таймаут
+                    setTimeout(() => {
+                        if (recorder.state === 'recording') {
+                            recorder.stop();
+                            reject(new Error('Таймаут записи'));
+                        }
+                    }, 30000);
+                    
+                } catch (error) {
+                    reject(error);
                 }
             });
         }
@@ -452,119 +540,37 @@
             speakBtn.disabled = true;
             downloadBtn.disabled = true;
             playBtn.disabled = true;
-            showMessage('⏳ Подготовка к записи...', 'info');
+            showMessage('⏳ Запись началась...', 'info');
+            progressBar.classList.add('active');
+            updateProgress(10);
 
             try {
-                // Создаем AudioContext
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                // Записываем аудио
+                const webmBlob = await recordAudio(text);
                 
-                // Создаем MediaStreamDestination
-                const destination = audioContext.createMediaStreamDestination();
+                // Создаем аудио URL для плеера
+                audioUrl = URL.createObjectURL(webmBlob);
+                audioPlayer.src = audioUrl;
                 
-                // Создаем utterance для речи
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'fr-FR';
-                utterance.rate = 0.9;
-                utterance.pitch = 1;
-
-                // Ищем французский голос
-                const voices = window.speechSynthesis.getVoices();
-                const frenchVoice = voices.find(v => v.lang.startsWith('fr'));
-                if (frenchVoice) {
-                    utterance.voice = frenchVoice;
-                }
-
-                // Настраиваем MediaRecorder
-                mediaRecorder = new MediaRecorder(destination.stream, {
-                    mimeType: 'audio/webm;codecs=opus'
-                });
-
-                audioChunks = [];
-
-                mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) {
-                        audioChunks.push(event.data);
-                    }
-                };
-
-                mediaRecorder.onstop = async () => {
-                    try {
-                        const blob = new Blob(audioChunks, { type: 'audio/webm' });
-                        audioBlob = blob;
-                        audioUrl = URL.createObjectURL(blob);
-                        audioPlayer.src = audioUrl;
-                        audioSection.classList.add('show');
-                        playBtn.disabled = false;
-                        downloadBtn.disabled = false;
-                        setStatus('Аудио создано ✅', 'done');
-                        speakBtn.disabled = false;
-                        showMessage('✅ Аудио готово! Нажмите "Скачать MP3" для сохранения.', 'success');
-                        progressBar.classList.remove('active');
-                        updateProgress(100);
-                    } catch (error) {
-                        console.error('Ошибка:', error);
-                        setStatus('Ошибка', 'error');
-                        speakBtn.disabled = false;
-                        showMessage('❌ Ошибка при создании аудио', 'error');
-                    }
-                };
-
-                // Запускаем запись
-                mediaRecorder.start();
-                isRecording = true;
-                progressBar.classList.add('active');
-                updateProgress(10);
-                showMessage('🎙️ Запись началась...', 'info');
-
-                // Воспроизводим речь
-                utterance.onstart = () => {
-                    setStatus('Говорит... 🎙️', 'speaking');
-                    updateProgress(30);
-                    showMessage('🔊 Озвучивание текста...', 'info');
-                };
-
-                utterance.onend = () => {
-                    updateProgress(80);
-                    showMessage('⏳ Завершение записи...', 'info');
-                    setTimeout(() => {
-                        if (mediaRecorder && mediaRecorder.state === 'recording') {
-                            mediaRecorder.stop();
-                            isRecording = false;
-                            updateProgress(100);
-                            showMessage('✅ Запись завершена!', 'success');
-                        }
-                    }, 500);
-                };
-
-                utterance.onerror = (event) => {
-                    console.error('Ошибка:', event);
-                    if (mediaRecorder && mediaRecorder.state === 'recording') {
-                        mediaRecorder.stop();
-                        isRecording = false;
-                    }
-                    setStatus('Ошибка', 'error');
-                    speakBtn.disabled = false;
-                    showMessage('❌ Ошибка синтеза речи', 'error');
-                };
-
-                window.speechSynthesis.speak(utterance);
-
-                // Таймаут
-                setTimeout(() => {
-                    if (isRecording && mediaRecorder && mediaRecorder.state === 'recording') {
-                        mediaRecorder.stop();
-                        isRecording = false;
-                        setStatus('Таймаут', 'error');
-                        speakBtn.disabled = false;
-                        showMessage('⏰ Таймаут записи', 'error');
-                    }
-                }, 30000);
-
+                // Сохраняем blob
+                audioBlob = webmBlob;
+                
+                // Показываем аудио секцию
+                audioSection.classList.add('show');
+                playBtn.disabled = false;
+                downloadBtn.disabled = false;
+                setStatus('Аудио создано ✅', 'done');
+                speakBtn.disabled = false;
+                showMessage('✅ Аудио готово! Нажмите "Скачать MP3" для сохранения.', 'success');
+                progressBar.classList.remove('active');
+                updateProgress(100);
+                
             } catch (error) {
                 console.error('Ошибка:', error);
                 setStatus('Ошибка', 'error');
                 speakBtn.disabled = false;
                 showMessage('❌ Ошибка: ' + error.message, 'error');
+                progressBar.classList.remove('active');
             }
         }
 
@@ -581,10 +587,23 @@
                 setStatus('Конвертация в MP3...', 'converting');
                 showMessage('🔄 Конвертация в MP3... Подождите...', 'info');
                 progressBar.classList.add('active');
-                updateProgress(50);
+                updateProgress(30);
 
-                // Конвертируем в MP3
-                const mp3Blob = await convertToMp3(audioBlob);
+                // Конвертируем WebM в MP3 через WAV
+                // Сначала конвертируем WebM в WAV
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const arrayBuffer = await audioBlob.arrayBuffer();
+                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                
+                updateProgress(50);
+                
+                // Создаем WAV из audioBuffer
+                const wavBlob = await audioBufferToWav(audioBuffer);
+                
+                updateProgress(70);
+                
+                // Конвертируем WAV в MP3
+                const mp3Blob = await wavToMp3(wavBlob);
                 
                 updateProgress(100);
                 
@@ -606,11 +625,64 @@
 
             } catch (error) {
                 console.error('Ошибка конвертации:', error);
-                showMessage('❌ Ошибка конвертации в MP3: ' + error, 'error');
+                showMessage('❌ Ошибка конвертации в MP3: ' + error.message, 'error');
                 setStatus('Ошибка', 'error');
+                progressBar.classList.remove('active');
             } finally {
                 downloadBtn.disabled = false;
                 downloadBtn.textContent = '⬇️ Скачать MP3';
+            }
+        }
+
+        // Конвертация AudioBuffer в WAV
+        function audioBufferToWav(buffer) {
+            return new Promise((resolve) => {
+                const numOfChan = buffer.numberOfChannels;
+                const length = buffer.length * numOfChan * 2;
+                const sampleRate = buffer.sampleRate;
+                
+                const wavData = new ArrayBuffer(44 + length);
+                const view = new DataView(wavData);
+                
+                // RIFF идентификатор
+                writeString(view, 0, 'RIFF');
+                view.setUint32(4, 36 + length, true);
+                writeString(view, 8, 'WAVE');
+                writeString(view, 12, 'fmt ');
+                view.setUint32(16, 16, true);
+                view.setUint16(20, 1, true);
+                view.setUint16(22, numOfChan, true);
+                view.setUint32(24, sampleRate, true);
+                view.setUint32(28, sampleRate * numOfChan * 2, true);
+                view.setUint16(32, numOfChan * 2, true);
+                view.setUint16(34, 16, true);
+                writeString(view, 36, 'data');
+                view.setUint32(40, length, true);
+                
+                // Записываем аудио данные
+                const channels = [];
+                for (let i = 0; i < numOfChan; i++) {
+                    channels.push(buffer.getChannelData(i));
+                }
+                
+                let offset = 44;
+                for (let i = 0; i < buffer.length; i++) {
+                    for (let channel = 0; channel < numOfChan; channel++) {
+                        const sample = Math.max(-1, Math.min(1, channels[channel][i]));
+                        const intSample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+                        view.setInt16(offset, intSample, true);
+                        offset += 2;
+                    }
+                }
+                
+                const blob = new Blob([wavData], { type: 'audio/wav' });
+                resolve(blob);
+            });
+        }
+
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
             }
         }
 
