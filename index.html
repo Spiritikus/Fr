@@ -1,1 +1,334 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Озвучивание текста на французском</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #667eea;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 700px;
+            width: 100%;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: #2d3748;
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        
+        p {
+            color: #718096;
+            font-size: 16px;
+            margin-bottom: 25px;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 15px;
+            font-size: 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-family: Arial, sans-serif;
+            resize: vertical;
+        }
+        
+        .counter {
+            text-align: right;
+            color: #a0aec0;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+        
+        .buttons {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 14px 35px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        
+        .btn-speak {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-speak:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-clear {
+            background: #e2e8f0;
+            color: #2d3748;
+        }
+        
+        .btn-clear:hover {
+            background: #cbd5e0;
+        }
+        
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f7fafc;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 15px;
+            color: #4a5568;
+        }
+        
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        
+        .dot-gray { background: #a0aec0; }
+        .dot-green { background: #48bb78; animation: pulse 1s infinite; }
+        .dot-blue { background: #4299e1; }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.3); }
+        }
+        
+        .audio-box {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f7fafc;
+            border-radius: 12px;
+            display: none;
+        }
+        
+        .audio-box.show {
+            display: block;
+        }
+        
+        .audio-box audio {
+            width: 100%;
+        }
+        
+        .message {
+            padding: 15px;
+            background: #ebf8ff;
+            border-radius: 8px;
+            color: #2b6cb0;
+            text-align: center;
+            font-size: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🇫🇷 Озвучивание текста</h1>
+        <p>Вставьте текст на французском языке и нажмите кнопку для создания аудио</p>
+        
+        <textarea id="textInput">Bonjour à tous ! Aujourd'hui, nous allons explorer la beauté de la langue française.</textarea>
+        
+        <div class="counter" id="charCount">0 символов</div>
+        
+        <div class="buttons">
+            <button class="btn-speak" id="speakBtn">🔊 Создать аудио</button>
+            <button class="btn-clear" id="clearBtn">🗑️ Очистить</button>
+        </div>
+        
+        <div class="status">
+            <span class="dot dot-gray" id="statusDot"></span>
+            <span id="statusText">Готово</span>
+        </div>
+        
+        <div class="audio-box" id="audioBox">
+            <audio id="audioPlayer" controls></audio>
+            <div style="margin-top: 12px; text-align: right;">
+                <button class="btn-clear" id="downloadBtn" style="padding: 8px 20px; font-size: 14px;">
+                    ⬇️ Скачать аудио
+                </button>
+            </div>
+        </div>
+    </div>
 
+    <script>
+        // Получаем все элементы
+        const textInput = document.getElementById('textInput');
+        const speakBtn = document.getElementById('speakBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const charCount = document.getElementById('charCount');
+        const statusText = document.getElementById('statusText');
+        const statusDot = document.getElementById('statusDot');
+        const audioBox = document.getElementById('audioBox');
+        const audioPlayer = document.getElementById('audioPlayer');
+
+        // Обновление счетчика
+        function updateCounter() {
+            const len = textInput.value.length;
+            charCount.textContent = len + ' символов';
+        }
+
+        // Обновление статуса
+        function setStatus(text, type) {
+            statusText.textContent = text;
+            statusDot.className = 'dot';
+            if (type === 'idle') statusDot.classList.add('dot-gray');
+            else if (type === 'speaking') statusDot.classList.add('dot-green');
+            else if (type === 'done') statusDot.classList.add('dot-blue');
+        }
+
+        // Сброс аудио
+        function resetAudio() {
+            audioBox.classList.remove('show');
+            audioPlayer.pause();
+            audioPlayer.src = '';
+        }
+
+        // Основная функция - озвучивание
+        function speakText() {
+            const text = textInput.value.trim();
+
+            // Проверка на пустой текст
+            if (!text) {
+                alert('Пожалуйста, введите текст на французском языке.');
+                return;
+            }
+
+            // Проверка поддержки Speech Synthesis
+            if (!window.speechSynthesis) {
+                alert('Ваш браузер не поддерживает синтез речи. Используйте Chrome, Edge или Safari.');
+                return;
+            }
+
+            // Останавливаем текущую речь
+            if (window.speechSynthesis.speaking) {
+                window.speechSynthesis.cancel();
+            }
+
+            // Сбрасываем аудио плеер
+            resetAudio();
+            setStatus('Подготовка...', 'idle');
+            speakBtn.disabled = true;
+
+            // Создаем объект для озвучивания
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'fr-FR';
+            utterance.rate = 0.9;
+            utterance.pitch = 1;
+
+            // Ищем французский голос
+            const voices = window.speechSynthesis.getVoices();
+            const frenchVoice = voices.find(v => v.lang.startsWith('fr'));
+            if (frenchVoice) {
+                utterance.voice = frenchVoice;
+            }
+
+            // Обработчики событий
+            utterance.onstart = function() {
+                setStatus('Говорит... 🎙️', 'speaking');
+            };
+
+            utterance.onend = function() {
+                setStatus('Аудио создано ✅', 'done');
+                speakBtn.disabled = false;
+                
+                // Показываем аудио секцию
+                audioBox.classList.add('show');
+                audioPlayer.style.display = 'none';
+                
+                // Добавляем сообщение
+                const oldMsg = audioBox.querySelector('.message');
+                if (oldMsg) oldMsg.remove();
+                
+                const msg = document.createElement('div');
+                msg.className = 'message';
+                msg.textContent = '✅ Аудио успешно создано! Нажмите "Создать аудио" для повторного воспроизведения.';
+                audioBox.appendChild(msg);
+            };
+
+            utterance.onerror = function(event) {
+                console.error('Ошибка:', event);
+                setStatus('Ошибка синтеза', 'idle');
+                speakBtn.disabled = false;
+                alert('Произошла ошибка при синтезе речи. Попробуйте другой текст или браузер.');
+            };
+
+            // Запускаем озвучивание
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // Очистка
+        function clearText() {
+            textInput.value = '';
+            updateCounter();
+            setStatus('Очищено', 'idle');
+            resetAudio();
+            if (window.speechSynthesis && window.speechSynthesis.speaking) {
+                window.speechSynthesis.cancel();
+            }
+            speakBtn.disabled = false;
+        }
+
+        // Скачивание (сохраняет текст в файл)
+        function downloadAudio() {
+            const text = textInput.value.trim();
+            if (!text) {
+                alert('Сначала введите текст и создайте аудио.');
+                return;
+            }
+
+            const content = 'Текст для озвучивания:\n\n' + text;
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'озвучивание_текста.txt';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        // Назначаем обработчики
+        speakBtn.addEventListener('click', speakText);
+        clearBtn.addEventListener('click', clearText);
+        downloadBtn.addEventListener('click', downloadAudio);
+        textInput.addEventListener('input', updateCounter);
+
+        // Загружаем голоса
+        if (window.speechSynthesis) {
+            window.speechSynthesis.getVoices();
+        }
+
+        // Инициализация
+        updateCounter();
+        setStatus('Готово', 'idle');
+    </script>
+</body>
+</html>
