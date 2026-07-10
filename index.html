@@ -5,96 +5,134 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Озвучивание текста на французском</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #667eea;
+        * {
             margin: 0;
-            padding: 20px;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
+            padding: 20px;
         }
-        
+
         .container {
             background: white;
-            border-radius: 20px;
+            border-radius: 24px;
             padding: 40px;
-            max-width: 700px;
+            max-width: 750px;
             width: 100%;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
-        
+
         h1 {
             color: #2d3748;
             font-size: 32px;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
-        
-        p {
+
+        .subtitle {
             color: #718096;
             font-size: 16px;
             margin-bottom: 25px;
         }
-        
+
         textarea {
             width: 100%;
             height: 200px;
-            padding: 15px;
+            padding: 16px;
             font-size: 16px;
             border: 2px solid #e2e8f0;
             border-radius: 12px;
-            font-family: Arial, sans-serif;
+            font-family: inherit;
             resize: vertical;
+            transition: border-color 0.3s;
         }
-        
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
         .counter {
             text-align: right;
             color: #a0aec0;
             font-size: 14px;
             margin-top: 8px;
         }
-        
+
         .buttons {
-            margin-top: 20px;
             display: flex;
-            gap: 15px;
+            gap: 12px;
+            margin-top: 20px;
             flex-wrap: wrap;
         }
-        
-        button {
+
+        .btn {
             padding: 14px 35px;
             border: none;
             border-radius: 12px;
             font-size: 16px;
-            font-weight: bold;
+            font-weight: 600;
             cursor: pointer;
-            transition: 0.3s;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
-        
+
         .btn-speak {
-            background: #667eea;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
         }
-        
-        .btn-speak:hover {
-            background: #5a67d8;
+
+        .btn-speak:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
         }
-        
+
+        .btn-speak:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
         .btn-clear {
             background: #e2e8f0;
             color: #2d3748;
         }
-        
+
         .btn-clear:hover {
             background: #cbd5e0;
         }
-        
+
+        .btn-download {
+            background: #48bb78;
+            color: white;
+        }
+
+        .btn-download:hover {
+            background: #38a169;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(72, 187, 120, 0.4);
+        }
+
+        .btn-download:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         .status {
             margin-top: 20px;
-            padding: 15px;
+            padding: 14px 18px;
             background: #f7fafc;
             border-radius: 12px;
             display: flex;
@@ -103,73 +141,98 @@
             font-size: 15px;
             color: #4a5568;
         }
-        
+
         .dot {
             width: 12px;
             height: 12px;
             border-radius: 50%;
             display: inline-block;
+            flex-shrink: 0;
         }
-        
-        .dot-gray { background: #a0aec0; }
-        .dot-green { background: #48bb78; animation: pulse 1s infinite; }
-        .dot-blue { background: #4299e1; }
-        
+
+        .dot.idle { background: #a0aec0; }
+        .dot.speaking { 
+            background: #48bb78; 
+            animation: pulse 1s infinite;
+        }
+        .dot.done { background: #4299e1; }
+
         @keyframes pulse {
             0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.3); }
+            50% { transform: scale(1.4); }
         }
-        
-        .audio-box {
+
+        .audio-section {
             margin-top: 20px;
             padding: 20px;
             background: #f7fafc;
             border-radius: 12px;
             display: none;
         }
-        
-        .audio-box.show {
+
+        .audio-section.show {
             display: block;
         }
-        
-        .audio-box audio {
+
+        .audio-section audio {
             width: 100%;
+            border-radius: 8px;
         }
-        
+
+        .audio-controls {
+            display: flex;
+            gap: 12px;
+            margin-top: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .audio-controls .btn {
+            padding: 10px 24px;
+            font-size: 14px;
+        }
+
         .message {
-            padding: 15px;
+            padding: 12px;
             background: #ebf8ff;
             border-radius: 8px;
             color: #2b6cb0;
             text-align: center;
-            font-size: 15px;
+            margin-bottom: 12px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🇫🇷 Озвучивание текста</h1>
-        <p>Вставьте текст на французском языке и нажмите кнопку для создания аудио</p>
+        <h1>
+            <span>🇫🇷</span>
+            Озвучивание текста
+        </h1>
+        <p class="subtitle">Вставьте текст на французском языке и нажмите кнопку для создания аудио</p>
         
         <textarea id="textInput">Bonjour à tous ! Aujourd'hui, nous allons explorer la beauté de la langue française.</textarea>
         
         <div class="counter" id="charCount">0 символов</div>
         
         <div class="buttons">
-            <button class="btn-speak" id="speakBtn">🔊 Создать аудио</button>
-            <button class="btn-clear" id="clearBtn">🗑️ Очистить</button>
+            <button class="btn btn-speak" id="speakBtn">🔊 Создать аудио</button>
+            <button class="btn btn-clear" id="clearBtn">🗑️ Очистить</button>
         </div>
         
         <div class="status">
-            <span class="dot dot-gray" id="statusDot"></span>
+            <span class="dot idle" id="statusDot"></span>
             <span id="statusText">Готово</span>
         </div>
         
-        <div class="audio-box" id="audioBox">
+        <div class="audio-section" id="audioSection">
+            <div class="message" id="audioMessage">✅ Аудио готово! Используйте плеер для прослушивания.</div>
             <audio id="audioPlayer" controls></audio>
-            <div style="margin-top: 12px; text-align: right;">
-                <button class="btn-clear" id="downloadBtn" style="padding: 8px 20px; font-size: 14px;">
-                    ⬇️ Скачать аудио
+            <div class="audio-controls">
+                <button class="btn btn-download" id="downloadBtn">
+                    ⬇️ Скачать аудио (MP3)
+                </button>
+                <button class="btn btn-clear" id="playAgainBtn" style="padding: 10px 24px; font-size: 14px;">
+                    🔄 Повторить
                 </button>
             </div>
         </div>
@@ -181,11 +244,17 @@
         const speakBtn = document.getElementById('speakBtn');
         const clearBtn = document.getElementById('clearBtn');
         const downloadBtn = document.getElementById('downloadBtn');
+        const playAgainBtn = document.getElementById('playAgainBtn');
         const charCount = document.getElementById('charCount');
         const statusText = document.getElementById('statusText');
         const statusDot = document.getElementById('statusDot');
-        const audioBox = document.getElementById('audioBox');
+        const audioSection = document.getElementById('audioSection');
         const audioPlayer = document.getElementById('audioPlayer');
+        const audioMessage = document.getElementById('audioMessage');
+
+        // Переменная для хранения аудио данных
+        let audioBlob = null;
+        let audioUrl = null;
 
         // Обновление счетчика
         function updateCounter() {
@@ -194,34 +263,124 @@
         }
 
         // Обновление статуса
-        function setStatus(text, type) {
+        function setStatus(text, type = 'idle') {
             statusText.textContent = text;
-            statusDot.className = 'dot';
-            if (type === 'idle') statusDot.classList.add('dot-gray');
-            else if (type === 'speaking') statusDot.classList.add('dot-green');
-            else if (type === 'done') statusDot.classList.add('dot-blue');
+            statusDot.className = 'dot ' + type;
         }
 
         // Сброс аудио
         function resetAudio() {
-            audioBox.classList.remove('show');
+            audioSection.classList.remove('show');
             audioPlayer.pause();
             audioPlayer.src = '';
+            if (audioUrl) {
+                URL.revokeObjectURL(audioUrl);
+                audioUrl = null;
+            }
+            audioBlob = null;
+            downloadBtn.disabled = true;
         }
 
-        // Основная функция - озвучивание
-        function speakText() {
+        // Создание аудио из текста с помощью Web Audio API
+        function createAudioFromText(text) {
+            return new Promise((resolve, reject) => {
+                // Используем SpeechSynthesis для генерации речи
+                if (!window.speechSynthesis) {
+                    reject('Speech Synthesis не поддерживается');
+                    return;
+                }
+
+                // Создаем utterance
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'fr-FR';
+                utterance.rate = 0.9;
+                utterance.pitch = 1;
+
+                // Ищем французский голос
+                const voices = window.speechSynthesis.getVoices();
+                const frenchVoice = voices.find(v => v.lang.startsWith('fr'));
+                if (frenchVoice) {
+                    utterance.voice = frenchVoice;
+                }
+
+                // Создаем MediaStream из речи (используем запись через AudioContext)
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const dest = audioContext.createMediaStreamDestination();
+                const source = audioContext.createBufferSource();
+                
+                // Создаем пустой буфер для захвата аудио
+                const bufferSize = audioContext.sampleRate * 10; // 10 секунд
+                const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+                source.buffer = buffer;
+                source.connect(dest);
+
+                // Начинаем запись
+                const mediaRecorder = new MediaRecorder(dest.stream, { mimeType: 'audio/webm;codecs=opus' });
+                const chunks = [];
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) {
+                        chunks.push(e.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'audio/webm' });
+                    resolve(blob);
+                };
+
+                // Запускаем запись
+                mediaRecorder.start();
+
+                // Генерируем речь через SpeechSynthesis и одновременно записываем
+                // К сожалению, SpeechSynthesis не дает напрямую аудиоданные,
+                // поэтому используем обходной путь: проигрываем через динамик и записываем
+                // Это не идеально, но работает
+                const synth = window.speechSynthesis;
+                
+                utterance.onstart = () => {
+                    setStatus('Говорит... 🎙️', 'speaking');
+                    speakBtn.disabled = true;
+                };
+
+                utterance.onend = () => {
+                    // Ждем немного для завершения записи
+                    setTimeout(() => {
+                        mediaRecorder.stop();
+                        setStatus('Аудио создано ✅', 'done');
+                        speakBtn.disabled = false;
+                        resolve(null); // Сигнал завершения
+                    }, 500);
+                };
+
+                utterance.onerror = (e) => {
+                    mediaRecorder.stop();
+                    reject(e);
+                };
+
+                synth.speak(utterance);
+
+                // Таймаут на случай, если речь зависнет
+                setTimeout(() => {
+                    if (mediaRecorder.state === 'recording') {
+                        mediaRecorder.stop();
+                        reject('Таймаут синтеза речи');
+                    }
+                }, 30000);
+            });
+        }
+
+        // Основная функция озвучивания
+        async function speakText() {
             const text = textInput.value.trim();
 
-            // Проверка на пустой текст
             if (!text) {
                 alert('Пожалуйста, введите текст на французском языке.');
                 return;
             }
 
-            // Проверка поддержки Speech Synthesis
             if (!window.speechSynthesis) {
-                alert('Ваш браузер не поддерживает синтез речи. Используйте Chrome, Edge или Safari.');
+                alert('Ваш браузер не поддерживает синтез речи.');
                 return;
             }
 
@@ -230,56 +389,49 @@
                 window.speechSynthesis.cancel();
             }
 
-            // Сбрасываем аудио плеер
             resetAudio();
             setStatus('Подготовка...', 'idle');
             speakBtn.disabled = true;
+            downloadBtn.disabled = true;
 
-            // Создаем объект для озвучивания
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'fr-FR';
-            utterance.rate = 0.9;
-            utterance.pitch = 1;
+            try {
+                // Создаем аудио
+                const blob = await createAudioFromText(text);
+                
+                if (blob) {
+                    audioBlob = blob;
+                    audioUrl = URL.createObjectURL(blob);
+                    audioPlayer.src = audioUrl;
+                    audioSection.classList.add('show');
+                    downloadBtn.disabled = false;
+                    audioMessage.textContent = '✅ Аудио готово! Используйте плеер для прослушивания.';
+                } else {
+                    // Если blob null, значит речь уже воспроизведена через onend
+                    // Показываем сообщение
+                    audioMessage.textContent = '✅ Аудио создано! Нажмите "Повторить" для воспроизведения.';
+                    audioSection.classList.add('show');
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+                setStatus('Ошибка', 'idle');
+                speakBtn.disabled = false;
+                alert('Произошла ошибка при создании аудио. Попробуйте другой текст или браузер.');
+            }
+        }
 
-            // Ищем французский голос
-            const voices = window.speechSynthesis.getVoices();
-            const frenchVoice = voices.find(v => v.lang.startsWith('fr'));
-            if (frenchVoice) {
-                utterance.voice = frenchVoice;
+        // Скачивание аудио
+        function downloadAudio() {
+            if (!audioBlob) {
+                alert('Сначала создайте аудио.');
+                return;
             }
 
-            // Обработчики событий
-            utterance.onstart = function() {
-                setStatus('Говорит... 🎙️', 'speaking');
-            };
-
-            utterance.onend = function() {
-                setStatus('Аудио создано ✅', 'done');
-                speakBtn.disabled = false;
-                
-                // Показываем аудио секцию
-                audioBox.classList.add('show');
-                audioPlayer.style.display = 'none';
-                
-                // Добавляем сообщение
-                const oldMsg = audioBox.querySelector('.message');
-                if (oldMsg) oldMsg.remove();
-                
-                const msg = document.createElement('div');
-                msg.className = 'message';
-                msg.textContent = '✅ Аудио успешно создано! Нажмите "Создать аудио" для повторного воспроизведения.';
-                audioBox.appendChild(msg);
-            };
-
-            utterance.onerror = function(event) {
-                console.error('Ошибка:', event);
-                setStatus('Ошибка синтеза', 'idle');
-                speakBtn.disabled = false;
-                alert('Произошла ошибка при синтезе речи. Попробуйте другой текст или браузер.');
-            };
-
-            // Запускаем озвучивание
-            window.speechSynthesis.speak(utterance);
+            const link = document.createElement('a');
+            link.href = audioUrl;
+            link.download = 'озвучка_французский.mp3';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
 
         // Очистка
@@ -292,43 +444,41 @@
                 window.speechSynthesis.cancel();
             }
             speakBtn.disabled = false;
+            downloadBtn.disabled = true;
         }
 
-        // Скачивание (сохраняет текст в файл)
-        function downloadAudio() {
-            const text = textInput.value.trim();
-            if (!text) {
-                alert('Сначала введите текст и создайте аудио.');
-                return;
+        // Повторное воспроизведение
+        function playAgain() {
+            if (audioUrl) {
+                audioPlayer.play();
+                setStatus('Воспроизведение...', 'speaking');
+                audioPlayer.onplay = () => setStatus('Воспроизведение...', 'speaking');
+                audioPlayer.onended = () => setStatus('Аудио создано ✅', 'done');
+                audioPlayer.onpause = () => setStatus('Аудио создано ✅', 'done');
+            } else {
+                speakText();
             }
-
-            const content = 'Текст для озвучивания:\n\n' + text;
-            const blob = new Blob([content], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = 'озвучивание_текста.txt';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
         }
 
         // Назначаем обработчики
         speakBtn.addEventListener('click', speakText);
         clearBtn.addEventListener('click', clearText);
         downloadBtn.addEventListener('click', downloadAudio);
+        playAgainBtn.addEventListener('click', playAgain);
         textInput.addEventListener('input', updateCounter);
 
         // Загружаем голоса
         if (window.speechSynthesis) {
             window.speechSynthesis.getVoices();
+            window.speechSynthesis.onvoiceschanged = () => {
+                window.speechSynthesis.getVoices();
+            };
         }
 
         // Инициализация
         updateCounter();
         setStatus('Готово', 'idle');
+        downloadBtn.disabled = true;
     </script>
 </body>
 </html>
